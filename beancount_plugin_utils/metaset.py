@@ -8,7 +8,8 @@ Implements new methods:
 - `get` - retrieves a set of values from meta.
 - `reset` - tidy up suffixes.
 
-Under the hood, each value is saved in a seperate key with unique suffix of digits. Order not guaranteed.
+Under the hood, each value is saved in a seperate key with unique suffix of digits.
+Order not guaranteed.
 """
 
 from typing import List, Set, Union, Tuple

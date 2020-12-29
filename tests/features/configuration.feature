@@ -18,7 +18,7 @@ Feature: Configure plugin behavior
 
     Then the original transaction should not be modified
     And should produce config error:
-      Plugin "share" received a bad configuration. Please provide an object.
+      Invalid plugin configuration: Must be a single dict, skipping the plugin. The config: 'I am not an object'
 
   Scenario: Throw Error malicios config provided
 
@@ -32,7 +32,7 @@ Feature: Configure plugin behavior
 
     Then the original transaction should not be modified
     And should produce config error:
-      Plugin "share" received a bad configuration. Please provide an object.
+      Invalid plugin configuration: Must be a single dict, skipping the plugin. The config: 'print(1)'
 
   Scenario: Rename mark at tag
 
