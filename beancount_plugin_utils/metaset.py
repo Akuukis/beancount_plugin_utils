@@ -6,6 +6,7 @@ Implements `set` operations, but immutable: `add`, `remove`, `discard`, `clear`
 Implements new methods:
 - `set` - overwrites with a new set.
 - `get` - retrieves a set of values from meta.
+- `has` - boolean whenever `get` would retrieve something.
 - `reset` - tidy up suffixes.
 
 Under the hood, each value is saved in a seperate key with unique suffix of digits.
@@ -55,6 +56,10 @@ def get(meta: Meta, key: str) -> Set[str]:
     return [v for k, v in meta.items() if contains_key(key, k)]
 
 
+def has(meta: Meta, key: str) -> bool:
+    return len(get(meta, key)) > 0
+
+
 def add(meta: Meta, key: str, value: str) -> Meta:
     copy = deepcopy(meta)
     safe_key: str
@@ -94,14 +99,14 @@ def clear(meta: Meta, key: str) -> Meta:
 
     return copy
 
-## Not used for now. Disabled to not pollute coverage report.
-# def set(meta: Meta, key: str, new_set: Set[str]) -> Meta:
-#     copy = clear(meta, key)
+# Not used for now. Disabled to not pollute coverage report.
+def set(meta: Meta, key: str, new_set: Set[str]) -> Meta:
+    copy = clear(meta, key)
 
-#     for elem in new_set:
-#         copy = add(meta, key, elem)
+    for elem in new_set:
+        copy = add(copy, key, elem)
 
-#     return copy
+    return copy
 
 ## Not used for now. Disabled to not pollute coverage report.
 # def reset(meta: Meta, key: str) -> Meta:

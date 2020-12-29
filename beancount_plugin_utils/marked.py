@@ -1,24 +1,45 @@
-from typing import List, Set
+from typing import List, Set, Union
 from copy import deepcopy
+from collections import namedtuple
 
-from beancount.core.data import Transaction, Posting
+from beancount.core.data import Transaction, Posting, new_metadata
 
 import beancount_plugin_utils.metaset as metaset
 
 
 MARK_SEPERATOR = "-"
 
+PluginUtilsMarkedError = namedtuple('PluginUtilsMarkedError', 'source message entry')
 
-def normalize_transaction(tx: Transaction, mark_name: str):
+
+def normalize_transaction(
+    mark_name: str,
+    tx: Transaction,
+    account_types: Union[Set[str], bool] = False,
+):
     """
     Move marks in tags with name `mark_name` into meta, if any, and merge with marks in meta in a way of metaset.
+    Then, if `account_types` are provided, move marks into postings with the given account types or error if there's none such posting.
+
+    Example:
+
+        try:
+            tx = marked("share", orig_tx, set("Income", "Expense"))
+        except:
+            new_entries.push(orig_tx)
+            errors.push()
+        for posting, orig_posting in zip(tx, orig_tx):
+            marks = metaset.get(posting)
+            # Do your thing.
 
     Args:
         txs [Transaction]: transaction instances.
         mark_name [str]: the mark name.
+        account_types [Set[str], False]: set of account types that must be considered, defaults to False.
 
-    Return:
+    Returns:
         new Transaction instance with normalized marks.
+        None or PluginUtilsMarkedError.
     """
     copy = deepcopy(tx)
 
@@ -34,49 +55,64 @@ def normalize_transaction(tx: Transaction, mark_name: str):
                 ),
             )
 
-    return copy
+
+    is_used = False
+    if metaset.has(copy.meta, mark_name):
+        is_used = True
+
+    for posting in copy.postings:
+        if metaset.has(posting.meta, mark_name):
+            is_used = True
+            if not account_types:
+                return tx, PluginUtilsMarkedError(
+                    new_metadata(posting.meta["filename"], posting.meta["lineno"]),
+                    'Mark "{}" can be only applied to transactions, not postings: "{}".'.format(mark_name, posting.account),
+                    tx,
+                ), True
+            if not (posting.account.split(":")[0] in account_types):
+                return tx, PluginUtilsMarkedError(
+                    new_metadata(posting.meta["filename"], posting.meta["lineno"]),
+                    'Mark "{}" can be only applied to posting with account types of: {}'.format(mark_name, account_types),
+                    tx,
+                ), True
 
 
-DEFAULT_APPLICABLE_ACCOUNT_TYPES = set(
-    ["Income", "Expenses", "Assets", "Liabilities", "Equity"]
-)
+    if not account_types:
+        return copy, None, is_used
 
+    if not is_used:
+        return copy, None, False
 
-def resolve_postings(
-    tx: Transaction,
-    mark_name: str,
-    applicable_account_types: Set[str] = DEFAULT_APPLICABLE_ACCOUNT_TYPES,
-    allow_posting_level_mark: bool = True,
-):
-    """
-    Iterates over postings of the transaction, returning most specific mark value for applicable account types.
+    is_applied = False
+    postings = []
+    default_marks = metaset.get(copy.meta, mark_name)
+    copy = copy._replace(meta=metaset.clear(copy.meta, mark_name))
 
-    Args:
-        tx [Transaction]: transaction instance.
-        mark_name [str]: the mark.
-        applicable_account_types [Set[str]]: set of account types that must be considered, defaults to all five.
-        allow_posting_level_mark [bool]: set to False if posting-level marks should raise error instead.
-    Yields:
-        list of mark values or None.
-        posting.
-        original posting.
-        original transaction.
-    """
-    copy = deepcopy(tx)
-
-    default_marks = metaset.get(tx.meta, mark_name)
-    copy = copy._replace(meta=metaset.clear(tx.meta, mark_name))
-
-    for _posting in copy.postings:
-        marks = metaset.get(_posting.meta, mark_name)
-        posting = _posting._replace(meta=metaset.clear(_posting.meta, mark_name))
+    for posting in copy.postings:
+        marks = metaset.get(posting.meta, mark_name)
 
         if len(marks) > 0:
-            yield marks, posting, _posting, copy
-        elif len(default_marks) > 0:
-            if posting.account.split(":")[0] not in applicable_account_types:
-                yield None, posting, _posting, copy
-            else:
-                yield default_marks, posting, _posting, copy
+            postings.append(posting)
+            is_applied = True
+        elif len(default_marks) > 0 and (posting.account.split(":")[0] in account_types):
+            postings.append(posting._replace(meta=metaset.set(posting.meta, mark_name, default_marks)))
+            is_applied = True
         else:
-            yield None, posting, _posting, copy
+            postings.append(posting)
+
+
+    print(is_used)
+    print(postings)
+
+    if not is_applied:
+        return tx, PluginUtilsMarkedError(
+            new_metadata(tx.meta["filename"], tx.meta["lineno"]),
+            'Mark "{}" on a transaction has no effect because transaction does not have postings with account types of: {}'.format(mark_name, account_types),
+            tx,
+        ), True
+
+    copy = copy._replace(
+        postings=postings
+    )
+
+    return copy, None, True

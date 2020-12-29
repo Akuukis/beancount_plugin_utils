@@ -101,10 +101,15 @@ def example_plugin(
 
 
         # 2. Normalize marks.
-        tx = marked.normalize_transaction(entry, config.mark_name)
-        marked_postings_result = list(
-            marked.resolve_postings(tx, config.mark_name, ("Income", "Expenses"))
-        )
+        tx, marked_error, is_marked = marked.normalize_transaction(config.mark_name, entry, ("Income", "Expenses"))
+        if marked_error:
+            new_entries.append(entry)
+            errors.append(marked_error)
+            continue
+
+        if not is_marked:
+            new_entries.append(entry)
+            continue
 
         # 3. Determine whenever this is debtor or creditor transactions.
         account_prefix: str
@@ -112,28 +117,11 @@ def example_plugin(
         total_expenses = sum_expenses(tx)
         total_value: Amount
 
-        # 3.1. If transaction is marked but has no effect on any postings, error.
-        if (
-            total_expenses.is_empty()
-            and total_income.is_empty()
-            and metaset.get(tx.meta, config.mark_name)
-        ):
-            errors.append(
-                PluginExampleParseError(
-                    new_metadata(entry.meta["filename"], entry.meta["lineno"]),
-                    'Plugin "share" doesn\'t work on transactions that has nor income and expense.',
-                    entry,
-                )
-            )
+        if total_expenses.is_empty() and total_income.is_empty():
+            #  If tx nor postings are not marked, bail early.
             new_entries.append(entry)
             continue
-
-        # 3.2. If tx nor postings are not marked, bail early.
-        if len([elem for elem, _, _, _ in marked_postings_result if elem != None]) == 0:
-            new_entries.append(entry)
-            continue
-
-        if not total_expenses.is_empty() and total_income.is_empty():
+        elif not total_expenses.is_empty() and total_income.is_empty():
             account_prefix = config.account_debtors + ":"
             total_value = total_expenses.get_currency_units(
                 tx.postings[0].units.currency
@@ -155,10 +143,12 @@ def example_plugin(
         # 4. Per posting, split it up based on marks.
         new_postings = []
         bailed = False
-        for marks, posting, orig, tx_clean in marked_postings_result:
+        for posting, orig in zip(tx.postings, entry.postings):
+            marks = metaset.get(posting.meta, config.mark_name)
+            print(marks)
 
             # 4.1. or skip if not marked.
-            if marks == None:
+            if len(marks) == 0:
                 new_postings.append(posting)
                 continue
 
@@ -432,7 +422,8 @@ def example_plugin(
             posting = posting._replace(
                 units=posting.units._replace(
                     number=(remainder.number - total).quantize(config.quantize)
-                )
+                ),
+                meta=metaset.clear(posting.meta, config.mark_name)
             )
 
             # if(posting.units.number > D(0)):
@@ -448,7 +439,7 @@ def example_plugin(
             new_postings = merge_postings(account, new_postings, config.meta_name)
 
         new_entries.append(
-            tx_clean._replace(
+            tx._replace(
                 postings=new_postings,
             )
         )
