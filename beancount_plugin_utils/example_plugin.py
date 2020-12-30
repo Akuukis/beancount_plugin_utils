@@ -177,10 +177,7 @@ def example_plugin(
                                     )
                                 except Exception:
                                     raiseError(
-                                        new_metadata(
-                                            posting.meta["filename"],
-                                            posting.meta["lineno"],
-                                        ),
+                                        posting.meta,
                                         'Something wrong with relative fraction "{}", please use a dot, e.g. "33.33p".'.format(
                                             parts[1]
                                         ),
@@ -199,10 +196,7 @@ def example_plugin(
                                     )
                                 except Exception:
                                     raiseError(
-                                        new_metadata(
-                                            posting.meta["filename"],
-                                            posting.meta["lineno"],
-                                        ),
+                                        posting.meta,
                                         'Something wrong with absolute fraction "{}", please use a dot, e.g. "2.50".'.format(
                                             parts[1]
                                         ),
