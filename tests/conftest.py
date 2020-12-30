@@ -134,7 +134,7 @@ def config_error(input_txns, errors, exception_text):
 def plugin_error(input_txns, errors, exception_text):
     original_txn = input_txns[-1]
     assert len(errors) == 1
-    expected_error = example_plugin.PluginExampleParseError(original_txn.meta, exception_text.strip('\n'), original_txn)
+    expected_error = example_plugin.PluginExampleError(original_txn.meta, exception_text.strip('\n'), original_txn)
     assert type(errors[0]) is type(expected_error)
     assert errors[0].message == expected_error.message
     assert strip_flaky_meta(errors[0].entry) == strip_flaky_meta(expected_error.entry)
