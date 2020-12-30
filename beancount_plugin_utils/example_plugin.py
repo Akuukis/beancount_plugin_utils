@@ -147,15 +147,6 @@ def example_plugin(
                         new_postings.append(posting)
                         continue
 
-                    if not (posting.account.split(":")[0] in ("Income", "Expenses")):
-                        raiseError(
-                            posting.meta,
-                            'Mark "share" doesn\'t make sense on a "{}" type posting.'.format(
-                                posting.account.split(":")[0]
-                            ),
-                            entry,
-                        )
-
                     # 5. Per mark, create a new posting.
                     todo_absolute: List[Tuple[Amount, str]] = list()
                     todo_percent: List[Tuple[float, str]] = list()
