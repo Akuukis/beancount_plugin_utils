@@ -3,8 +3,9 @@ from beancount.parser import printer
 
 BeancountErrorNamedTuple = namedtuple("BeancountError", "source message entry")
 
+
 class BeancountError(RuntimeError):
-    def __init__(self, source, message, entry, named_tuple = BeancountErrorNamedTuple):
+    def __init__(self, source, message, entry, named_tuple=BeancountErrorNamedTuple):
         self.source = source
         self.message = message
         self.entry = entry

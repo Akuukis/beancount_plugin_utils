@@ -10,7 +10,8 @@ from beancount_plugin_utils.BeancountError import BeancountError
 import beancount_plugin_utils.metaset as metaset
 
 
-PluginUtilsConfigError = namedtuple('PluginUtilsConfigError', 'source message entry')
+PluginUtilsConfigError = namedtuple("PluginUtilsConfigError", "source message entry")
+
 
 def parse_config_string(config_string):
     """
@@ -54,16 +55,18 @@ def parse_config_string(config_string):
             config_obj = ast.literal_eval(config_string)
     except:
         raise BeancountError(
-            new_metadata('<example_plugin>', 0),
-            'Invalid plugin configuration, skipping the plugin. The config: {}'.format(config_string),
+            new_metadata("<example_plugin>", 0),
+            "Invalid plugin configuration, skipping the plugin. The config: {}".format(config_string),
             None,
             PluginUtilsConfigError,
         )
 
     if not isinstance(config_obj, dict):
         raise BeancountError(
-            new_metadata('<example_plugin>', 0),
-            'Invalid plugin configuration: Must be a single dict, skipping the plugin. The config: {}'.format(config_string),
+            new_metadata("<example_plugin>", 0),
+            "Invalid plugin configuration: Must be a single dict, skipping the plugin. The config: {}".format(
+                config_string
+            ),
             None,
             PluginUtilsConfigError,
         )

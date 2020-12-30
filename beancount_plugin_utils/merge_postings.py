@@ -8,9 +8,8 @@ from beancount.core.data import (
 
 import beancount_plugin_utils.metaset as metaset
 
-def merge_postings(
-    account: Account, postings: List[Posting], meta_name: Union[str, None]
-) -> List[Posting]:
+
+def merge_postings(account: Account, postings: List[Posting], meta_name: Union[str, None]) -> List[Posting]:
     """
     Merges postings with an equal account name and takes meta of the first one.
     If `meta_name` is provided, then in a way of metaset combine meta values whose keys equal to `meta_name`.
@@ -45,10 +44,6 @@ def merge_postings(
 
     if share_postings:
         for pos in share_balance:
-            grouped_postings.append(
-                Posting(
-                    account, pos.units, pos.cost, None, None, share_postings[0].meta
-                )
-            )
+            grouped_postings.append(Posting(account, pos.units, pos.cost, None, None, share_postings[0].meta))
 
     return grouped_postings

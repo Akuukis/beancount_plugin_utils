@@ -82,6 +82,7 @@ def discard(meta: Meta, key: str) -> Meta:
 
     return copy
 
+
 ## Not used for now. Disabled to not pollute coverage report.
 # def remove(meta: Meta, key: str) -> Meta:
 #     copy = deepcopy(meta)
@@ -99,6 +100,7 @@ def clear(meta: Meta, key: str) -> Meta:
 
     return copy
 
+
 # Not used for now. Disabled to not pollute coverage report.
 def set(meta: Meta, key: str, new_set: Set[str]) -> Meta:
     copy = clear(meta, key)
@@ -107,6 +109,7 @@ def set(meta: Meta, key: str, new_set: Set[str]) -> Meta:
         copy = add(copy, key, elem)
 
     return copy
+
 
 ## Not used for now. Disabled to not pollute coverage report.
 # def reset(meta: Meta, key: str) -> Meta:
