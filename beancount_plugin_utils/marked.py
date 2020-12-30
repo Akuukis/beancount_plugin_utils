@@ -105,9 +105,6 @@ def normalize_transaction(
         else:
             postings.append(posting)
 
-    print(is_used)
-    print(postings)
-
     if not is_applied:
         raise BeancountError(
             tx.meta,
