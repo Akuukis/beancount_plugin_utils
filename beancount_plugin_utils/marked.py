@@ -5,6 +5,7 @@ from collections import namedtuple
 from beancount.core.data import Transaction, Posting, new_metadata
 
 import beancount_plugin_utils.metaset as metaset
+from beancount_plugin_utils.BeancountError import BeancountError
 
 
 MARK_SEPERATOR = "-"
@@ -24,10 +25,12 @@ def normalize_transaction(
     Example:
 
         try:
-            tx = marked("share", orig_tx, set("Income", "Expense"))
-        except:
-            new_entries.push(orig_tx)
-            errors.push()
+            tx, is_marked = marked.normalize_transaction(config.mark_name, entry, ("Income", "Expenses"))
+        except BeancountError as e:
+            new_entries.append(entry)
+            errors.append(e.to_named_tuple())
+            continue
+
         for posting, orig_posting in zip(tx, orig_tx):
             marks = metaset.get(posting)
             # Do your thing.
@@ -39,7 +42,10 @@ def normalize_transaction(
 
     Returns:
         new Transaction instance with normalized marks.
-        None or PluginUtilsMarkedError.
+        boolean of whenever mark was used in this transaction.
+
+    Raises:
+        BeancountError.
     """
     copy = deepcopy(tx)
 
@@ -64,24 +70,26 @@ def normalize_transaction(
         if metaset.has(posting.meta, mark_name):
             is_used = True
             if not account_types:
-                return tx, PluginUtilsMarkedError(
+                raise BeancountError(
                     new_metadata(posting.meta["filename"], posting.meta["lineno"]),
                     'Mark "{}" can be only applied to transactions, not postings: "{}".'.format(mark_name, posting.account),
                     tx,
-                ), True
+                    PluginUtilsMarkedError,
+                )
             if not (posting.account.split(":")[0] in account_types):
-                return tx, PluginUtilsMarkedError(
+                raise BeancountError(
                     new_metadata(posting.meta["filename"], posting.meta["lineno"]),
                     'Mark "{}" can be only applied to posting with account types of: {}'.format(mark_name, account_types),
                     tx,
-                ), True
+                    PluginUtilsMarkedError,
+                )
 
 
     if not account_types:
-        return copy, None, is_used
+        return copy, is_used
 
     if not is_used:
-        return copy, None, False
+        return copy, False
 
     is_applied = False
     postings = []
@@ -105,14 +113,15 @@ def normalize_transaction(
     print(postings)
 
     if not is_applied:
-        return tx, PluginUtilsMarkedError(
+        raise BeancountError(
             new_metadata(tx.meta["filename"], tx.meta["lineno"]),
             'Mark "{}" on a transaction has no effect because transaction does not have postings with account types of: {}'.format(mark_name, account_types),
             tx,
-        ), True
+            PluginUtilsMarkedError,
+        )
 
     copy = copy._replace(
         postings=postings
     )
 
-    return copy, None, True
+    return copy, True

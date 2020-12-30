@@ -5,6 +5,7 @@ from typing import List, Set, Tuple, Union
 
 from beancount.core.data import Posting, Transaction, new_metadata
 from beancount.core.inventory import Inventory
+from beancount_plugin_utils.BeancountError import BeancountError
 
 import beancount_plugin_utils.metaset as metaset
 
@@ -20,9 +21,10 @@ def parse_config_string(config_string):
         # 1. Define a config structure first. See `class Config` above and adjust it as needed.
 
         # 2. Parse config string. Just copy/paste this block.
-        config_dict, config_error = parse_config_string(config_dict_string)
-        if config_error:
-            return entries, [config_error]
+        try:
+            config_dict = parse_config_string(config_dict_string)
+        except BeancountError as e:
+            return entries, [e.to_named_tuple()]
 
         # 3. Apply transforms (e.g. from `str` to `date`) where needed.
         # Wrap each transform separately in a try-except, and return PluginUtilsConfigError with a nice error message.
@@ -41,7 +43,9 @@ def parse_config_string(config_string):
 
     Returns:
         None or a dict of the configuration string.
-        None or PluginUtilsConfigError.
+
+    Raises:
+        BeancountError.
     """
     try:
         if len(config_string) == 0:
@@ -49,17 +53,19 @@ def parse_config_string(config_string):
         else:
             config_obj = ast.literal_eval(config_string)
     except:
-        return {}, PluginUtilsConfigError(
+        raise BeancountError(
             new_metadata('<example_plugin>', 0),
             'Invalid plugin configuration, skipping the plugin. The config: {}'.format(config_string),
             None,
+            PluginUtilsConfigError,
         )
 
     if not isinstance(config_obj, dict):
-        return {}, PluginUtilsConfigError(
+        raise BeancountError(
             new_metadata('<example_plugin>', 0),
             'Invalid plugin configuration: Must be a single dict, skipping the plugin. The config: {}'.format(config_string),
             None,
+            PluginUtilsConfigError,
         )
 
-    return config_obj, None
+    return config_obj

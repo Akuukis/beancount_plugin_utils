@@ -26,6 +26,7 @@ from beancount_plugin_utils.parse_config_string import parse_config_string, Plug
 from beancount_plugin_utils.common import sum_income, sum_expenses
 import beancount_plugin_utils.metaset as metaset
 import beancount_plugin_utils.marked as marked
+from beancount_plugin_utils.BeancountError import BeancountError
 from beancount_plugin_utils.merge_postings import merge_postings
 
 __plugins__ = ["example_plugin"]
@@ -62,9 +63,10 @@ def example_plugin(
     # 1. Define a config structure first. See `class Config` above and adjust it as needed.
 
     # 2. Parse config string. Just copy/paste this block.
-    config_dict, config_error = parse_config_string(config_dict_string)
-    if config_error:
-        return entries, [config_error]
+    try:
+        config_dict = parse_config_string(config_dict_string)
+    except BeancountError as e:
+        return entries, [e.to_named_tuple()]
 
     # 3. Apply transforms (e.g. from `str` to `date`) where needed.
     # Wrap each transform separately in a try-except, and return PluginUtilsConfigError with a nice error message.
@@ -101,10 +103,11 @@ def example_plugin(
 
 
         # 2. Normalize marks.
-        tx, marked_error, is_marked = marked.normalize_transaction(config.mark_name, entry, ("Income", "Expenses"))
-        if marked_error:
+        try:
+            tx, is_marked = marked.normalize_transaction(config.mark_name, entry, ("Income", "Expenses"))
+        except BeancountError as e:
             new_entries.append(entry)
-            errors.append(marked_error)
+            errors.append(e.to_named_tuple())
             continue
 
         if not is_marked:
