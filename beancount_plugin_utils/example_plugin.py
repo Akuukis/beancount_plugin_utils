@@ -51,32 +51,13 @@ PluginExampleError = namedtuple("PluginExampleError", "source message entry")
 
 new_accounts: Set[Account] = set()
 
+
 def example_plugin(entries: Entries, unused_options_map, config_string: str) -> Tuple[Entries, List[NamedTuple]]:
     new_entries: Entries = []
     errors: List[NamedTuple] = []
 
     with plugin_error_handler(entries, new_entries, errors, "example_plugin", PluginExampleError):
-        ############################################################################
-        #### Load config (optional)
-
-        # 1. Define a config structure first. See `class Config` above and adjust it as needed.
-
-        # 2. Parse config string. Just copy/paste this block.
-        config_dict = parse_config_string(config_string)
-
-        # 3. Apply transforms (e.g. from `str` to `date`) where needed.
-        # Wrap each transform separately in a try-except, and return PluginUtilsConfigError with a nice error message.
-        try:
-            if "open_date" in config_dict:
-                config_dict["open_date"] = (
-                    None if config_dict["open_date"] is None else date.fromisoformat(config_dict["open_date"])
-                )
-        except:
-            raise RuntimeError('Bad "open_date" value - it must be a valid date, formatted in UTC (e.g. "2000-01-01").')
-
-        # 4. Create config itself. Just copy/paste this block. Done!
-        config = Config(**config_dict)
-
+        config = load_config(config_string)
         ############################################################################
         #### The plugin logic goes here. Few tips:
         #### - what plugin skips, just push the orignal `entry` into `new_entries`.
@@ -94,6 +75,27 @@ def example_plugin(entries: Entries, unused_options_map, config_string: str) -> 
                 new_entries.append(open_entry)
 
     return new_entries, errors
+
+
+def load_config(config_string: str) -> Config:
+    ############################################################################
+    #### Load config (optional)
+
+    # 1. Parse config string. Just copy/paste this block.
+    config_dict = parse_config_string(config_string)
+
+    # 2. Apply transforms (e.g. from `str` to `date`) where needed.
+    # Wrap each transform separately in a try-except, and return PluginUtilsConfigError with a nice error message.
+    try:
+        if "open_date" in config_dict:
+            config_dict["open_date"] = (
+                None if config_dict["open_date"] is None else date.fromisoformat(config_dict["open_date"])
+            )
+    except:
+        raise RuntimeError('Bad "open_date" value - it must be a valid date, formatted in UTC (e.g. "2000-01-01").')
+
+    # 3. Create config itself. Just copy/paste this block. Done!
+    return Config(**config_dict)
 
 
 def per_marked_transaction(tx: Transaction, tx_orig: Transaction, config: Config) -> List[Transaction]:
