@@ -58,12 +58,7 @@ def example_plugin(entries: Entries, unused_options_map, config_string: str) -> 
 
     with plugin_error_handler(entries, new_entries, errors, "example_plugin", PluginExampleError):
         config = load_config(config_string)
-        ############################################################################
-        #### The plugin logic goes here. Few tips:
-        #### - what plugin skips, just push the orignal `entry` into `new_entries`.
-        #### - what plugin transforms, create a new object and push that into `new_entries`. DO NOT MUTATE original entry.
-        #### - if there's a global problem, return return original `entries` and appropriate errors.
-        #### - if there's a entry level problem, push the original `entry` and an appropriate error to `errors`, and move on.
+
         new_entries[:], errors[:] = marked.on_marked_transactions(
             per_marked_transaction, entries, config, config.mark_name, ("Income", "Expenses"), PluginExampleError
         )
@@ -99,7 +94,6 @@ def load_config(config_string: str) -> Config:
 
 
 def per_marked_transaction(tx: Transaction, tx_orig: Transaction, config: Config) -> List[Transaction]:
-    # 3. Determine whenever this is debtor or creditor transactions.
     account_prefix: str
     total_income = sum_income(tx)
     total_expenses = sum_expenses(tx)
