@@ -49,6 +49,10 @@ class Config(NamedTuple):
 PluginExampleError = namedtuple("PluginExampleError", "source message entry")
 
 
+def raiseError(meta, message, entry):
+    raise BeancountError(meta, message, entry, PluginExampleError)
+
+
 def example_plugin(
     entries: Entries,
     unused_options_map,
@@ -77,11 +81,10 @@ def example_plugin(
                     None if config_dict["open_date"] is None else date.fromisoformat(config_dict["open_date"])
                 )
         except:
-            raise BeancountError(
+            raiseError(
                 new_metadata("<example_plugin>", 0),
                 'Plugin "example_plugin" received bad "open_date" value - it must be a valid date, formatted in UTC (e.g. "2000-01-01").',
                 None,
-                PluginExampleError,
             )
 
         # 4. Create config itself. Just copy/paste this block. Done!
@@ -127,11 +130,10 @@ def example_plugin(
                     account_prefix = config.account_creditors + ":"
                     total_value = total_income.get_currency_units(tx.postings[0].units.currency)
                 else:
-                    raise BeancountError(
-                        new_metadata(entry.meta["filename"], entry.meta["lineno"]),
+                    raiseError(
+                        entry.meta,
                         'Plugin "share" doesn\'t work on transactions that has both income and expense: please split it up into two transactions instead.',
                         entry,
-                        PluginExampleError,
                     )
 
                 # 4. Per posting, split it up based on marks.
@@ -146,13 +148,12 @@ def example_plugin(
                         continue
 
                     if not (posting.account.split(":")[0] in ("Income", "Expenses")):
-                        raise BeancountError(
-                            new_metadata(posting.meta["filename"], posting.meta["lineno"]),
+                        raiseError(
+                            posting.meta,
                             'Mark "share" doesn\'t make sense on a "{}" type posting.'.format(
                                 posting.account.split(":")[0]
                             ),
                             entry,
-                            PluginExampleError,
                         )
 
                     # 5. Per mark, create a new posting.
@@ -165,11 +166,10 @@ def example_plugin(
 
                         # 5.1. Apply defaults.
                         if parts[0] == "":
-                            raise BeancountError(
-                                new_metadata(posting.meta["filename"], posting.meta["lineno"]),
+                            raiseError(
+                                posting.meta,
                                 'Plugin "share" requires mark to contain account name, seperated with "-".',
                                 entry,
-                                PluginExampleError,
                             )
 
                         account = parts[0] if ":" in parts[0] else account_prefix + parts[0]
@@ -185,7 +185,7 @@ def example_plugin(
                                         )
                                     )
                                 except Exception:
-                                    raise BeancountError(
+                                    raiseError(
                                         new_metadata(
                                             posting.meta["filename"],
                                             posting.meta["lineno"],
@@ -194,7 +194,6 @@ def example_plugin(
                                             parts[1]
                                         ),
                                         entry,
-                                        PluginExampleError,
                                     )
                             else:
                                 try:
@@ -208,7 +207,7 @@ def example_plugin(
                                         )
                                     )
                                 except Exception:
-                                    raise BeancountError(
+                                    raiseError(
                                         new_metadata(
                                             posting.meta["filename"],
                                             posting.meta["lineno"],
@@ -217,7 +216,6 @@ def example_plugin(
                                             parts[1]
                                         ),
                                         entry,
-                                        PluginExampleError,
                                     )
                         else:
                             todo_absent.append(account)
@@ -229,35 +227,31 @@ def example_plugin(
                     total_shared_relative = sum([percent for percent, _ in todo_percent])
 
                     if total_shared_absolute > abs(total_value.number):
-                        raise BeancountError(
-                            new_metadata(posting.meta["filename"], posting.meta["lineno"]),
+                        raiseError(
+                            posting.meta,
                             "The posting can't share more than it's absolute value",
                             entry,
-                            PluginExampleError,
                         )
 
                     if total_shared_relative > 1:
-                        raise BeancountError(
-                            new_metadata(posting.meta["filename"], posting.meta["lineno"]),
+                        raiseError(
+                            posting.meta,
                             "The posting can't share more percent than 100%.",
                             entry,
-                            PluginExampleError,
                         )
 
                     if total_shared_absolute == abs(total_value.number) and total_shared_relative > 0:
-                        raise BeancountError(
-                            new_metadata(posting.meta["filename"], posting.meta["lineno"]),
+                        raiseError(
+                            posting.meta,
                             "It doesn't make sense to split a remaining amount of zero.",
                             entry,
-                            PluginExampleError,
                         )
 
                     if total_shared_relative == 1 and len(todo_absent) > 0:
-                        raise BeancountError(
-                            new_metadata(posting.meta["filename"], posting.meta["lineno"]),
+                        raiseError(
+                            posting.meta,
                             "It doesn't make sense to further auto-split when amount is already split for full 100%.",
                             entry,
-                            PluginExampleError,
                         )
 
                     new_postings_inner = []
