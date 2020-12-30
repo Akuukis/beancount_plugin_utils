@@ -8,6 +8,7 @@ __author__ = "Akuukis"
 from datetime import date, datetime
 from typing import NamedTuple, Set, List, Union, Tuple
 from collections import namedtuple
+from contextlib import contextmanager
 import re
 
 from beancount.core.inventory import Inventory
@@ -29,7 +30,7 @@ from beancount_plugin_utils.parse_config_string import (
 from beancount_plugin_utils.common import sum_income, sum_expenses
 import beancount_plugin_utils.metaset as metaset
 import beancount_plugin_utils.marked as marked
-from beancount_plugin_utils.BeancountError import BeancountError
+from beancount_plugin_utils.BeancountError import BeancountError, posting_error_handler
 from beancount_plugin_utils.merge_postings import merge_postings
 
 __plugins__ = ["example_plugin"]
@@ -141,207 +142,189 @@ def per_marked_transaction(tx: Transaction, tx_orig: Transaction, config: Config
     # 4. Per posting, split it up based on marks.
     new_postings = []
     for posting in tx.postings:
-        marks = metaset.get(posting.meta, config.mark_name)
-        print(marks)
+        with posting_error_handler(tx_orig, posting, PluginExampleError):
+            marks = metaset.get(posting.meta, config.mark_name)
 
-        # 4.1. or skip if not marked.
-        if len(marks) == 0:
-            new_postings.append(posting)
-            continue
+            # 4.1. or skip if not marked.
+            if len(marks) == 0:
+                new_postings.append(posting)
+                continue
 
-        # 5. Per mark, create a new posting.
-        todo_absolute: List[Tuple[Amount, str]] = list()
-        todo_percent: List[Tuple[float, str]] = list()
-        todo_absent: List[str] = list()
-        for mark in marks:
-            parts = mark.split("-")
-            account: str
+            # 5. Per mark, create a new posting.
+            todo_absolute: List[Tuple[Amount, str]] = list()
+            todo_percent: List[Tuple[float, str]] = list()
+            todo_absent: List[str] = list()
+            for mark in marks:
+                parts = mark.split("-")
+                account: str
 
-            # 5.1. Apply defaults.
-            if parts[0] == "":
-                raiseError(
-                    posting.meta,
-                    'Plugin "share" requires mark to contain account name, seperated with "-".',
-                    tx_orig,
-                )
+                # 5.1. Apply defaults.
+                if parts[0] == "":
+                    raise RuntimeError('Plugin "share" requires mark to contain account name, seperated with "-".')
 
-            account = parts[0] if ":" in parts[0] else account_prefix + parts[0]
-            new_accounts.add(account)
+                account = parts[0] if ":" in parts[0] else account_prefix + parts[0]
+                new_accounts.add(account)
 
-            if len(parts) > 1:
-                if "%" in parts[1] or "p" in parts[1]:
-                    try:
-                        todo_percent.append(
-                            (
-                                float(parts[1].split("%")[0].split("p")[0]) / 100,
-                                account,
+                if len(parts) > 1:
+                    if "%" in parts[1] or "p" in parts[1]:
+                        try:
+                            todo_percent.append(
+                                (
+                                    float(parts[1].split("%")[0].split("p")[0]) / 100,
+                                    account,
+                                )
                             )
-                        )
-                    except Exception:
-                        raiseError(
-                            posting.meta,
-                            'Something wrong with relative fraction "{}", please use a dot, e.g. "33.33p".'.format(
-                                parts[1]
-                            ),
-                            tx_orig,
-                        )
+                        except Exception:
+                            raise RuntimeError(
+                                'Something wrong with relative fraction "{}", please use a dot, e.g. "33.33p".'.format(
+                                    parts[1]
+                                )
+                            )
+                    else:
+                        try:
+                            todo_absolute.append(
+                                (
+                                    Amount(
+                                        D(parts[1]).quantize(config.quantize),
+                                        posting.units.currency,
+                                    ),
+                                    account,
+                                )
+                            )
+                        except Exception:
+                            raise RuntimeError(
+                                'Something wrong with absolute fraction "{}", please use a dot, e.g. "2.50".'.format(
+                                    parts[1]
+                                )
+                            )
                 else:
-                    try:
-                        todo_absolute.append(
-                            (
-                                Amount(
-                                    D(parts[1]).quantize(config.quantize),
-                                    posting.units.currency,
-                                ),
-                                account,
-                            )
-                        )
-                    except Exception:
-                        raiseError(
+                    todo_absent.append(account)
+
+            total_shared_absolute = sum(
+                [amount.number for amount, _ in todo_absolute],
+                D(0).quantize(config.quantize),
+            )
+            total_shared_relative = sum([percent for percent, _ in todo_percent])
+
+            if total_shared_absolute > abs(total_value.number):
+                raise RuntimeError("The posting can't share more than it's absolute value")
+
+            if total_shared_relative > 1:
+                raise RuntimeError(
+                    "The posting can't share more percent than 100%.",
+                )
+
+            if total_shared_absolute == abs(total_value.number) and total_shared_relative > 0:
+                raise RuntimeError("It doesn't make sense to split a remaining amount of zero.")
+
+            if total_shared_relative == 1 and len(todo_absent) > 0:
+                raise RuntimeError(
+                    "It doesn't make sense to further auto-split when amount is already split for full 100%."
+                )
+
+            new_postings_inner = []
+            # 5.2. Handle absolute amounts first: mutate original posting's amount & create new postings.
+            for amount, account in todo_absolute:
+                posting = posting._replace(
+                    units=posting.units._replace(
+                        number=(posting.units.number - amount.number).quantize(config.quantize)
+                    ),
+                )
+                if config.meta_name is not None:
+                    posting = posting._replace(
+                        meta=metaset.add(posting.meta, config.meta_name, account + " " + amount.to_string())
+                    )
+                new_postings_inner.append(
+                    Posting(
+                        account,
+                        units=posting.units._replace(number=(amount.number).quantize(config.quantize)),
+                        cost=posting.cost,
+                        price=None,
+                        flag=None,
+                        meta={}
+                        if config.meta_name is None
+                        else {config.meta_name: posting.account + " " + amount.to_string()},
+                    )
+                )
+
+            # 5.3. Handle relative amounts second: create new postings.
+            remainder = posting.units
+            total = D(0)
+            for percent, account in todo_percent:
+                units = posting.units._replace(number=(D(float(remainder.number) * percent)).quantize(config.quantize))
+                total = total + units.number
+                new_postings_inner.append(
+                    Posting(
+                        account,
+                        units=units,
+                        cost=posting.cost,
+                        price=None,
+                        flag=None,
+                        meta={}
+                        if config.meta_name is None
+                        else {
+                            config.meta_name: posting.account
+                            + " "
+                            + str(int(percent * 100))
+                            + "% ("
+                            + units.to_string()
+                            + ")"
+                        },
+                    )
+                )
+                if config.meta_name is not None:
+                    posting = posting._replace(
+                        meta=metaset.add(
                             posting.meta,
-                            'Something wrong with absolute fraction "{}", please use a dot, e.g. "2.50".'.format(
-                                parts[1]
-                            ),
-                            tx_orig,
+                            config.meta_name,
+                            account + " " + str(int(percent * 100)) + "% (" + units.to_string() + ")",
                         )
-            else:
-                todo_absent.append(account)
+                    )
 
-        total_shared_absolute = sum(
-            [amount.number for amount, _ in todo_absolute],
-            D(0).quantize(config.quantize),
-        )
-        total_shared_relative = sum([percent for percent, _ in todo_percent])
+            # 5.4. Handle absent amounts third: create new postings.
+            total_percent = sum(i for i, _ in todo_percent)
+            percent = (1 - total_percent) / (1 + len(todo_absent))
+            for account in todo_absent:
+                units = posting.units._replace(number=(D(float(remainder.number) * percent)).quantize(config.quantize))
+                total = total + units.number
+                new_postings_inner.append(
+                    Posting(
+                        account,
+                        units=units,
+                        cost=posting.cost,
+                        price=None,
+                        flag=None,
+                        meta={}
+                        if config.meta_name is None
+                        else {
+                            config.meta_name: posting.account
+                            + " ("
+                            + str(int(percent * 100))
+                            + "%, "
+                            + units.to_string()
+                            + ")"
+                        },
+                    )
+                )
+                if config.meta_name is not None:
+                    posting = posting._replace(
+                        meta=metaset.add(
+                            posting.meta,
+                            config.meta_name,
+                            account + " (" + str(int(percent * 100)) + "%, " + units.to_string() + ")",
+                        )
+                    )
 
-        if total_shared_absolute > abs(total_value.number):
-            raiseError(
-                posting.meta,
-                "The posting can't share more than it's absolute value",
-                tx_orig,
-            )
-
-        if total_shared_relative > 1:
-            raiseError(
-                posting.meta,
-                "The posting can't share more percent than 100%.",
-                tx_orig,
-            )
-
-        if total_shared_absolute == abs(total_value.number) and total_shared_relative > 0:
-            raiseError(
-                posting.meta,
-                "It doesn't make sense to split a remaining amount of zero.",
-                tx_orig,
-            )
-
-        if total_shared_relative == 1 and len(todo_absent) > 0:
-            raiseError(
-                posting.meta,
-                "It doesn't make sense to further auto-split when amount is already split for full 100%.",
-                tx_orig,
-            )
-
-        new_postings_inner = []
-        # 5.2. Handle absolute amounts first: mutate original posting's amount & create new postings.
-        for amount, account in todo_absolute:
+            # 5.5. Handle original posting last (mutate!).
             posting = posting._replace(
-                units=posting.units._replace(number=(posting.units.number - amount.number).quantize(config.quantize)),
-            )
-            if config.meta_name is not None:
-                posting = posting._replace(
-                    meta=metaset.add(posting.meta, config.meta_name, account + " " + amount.to_string())
-                )
-            new_postings_inner.append(
-                Posting(
-                    account,
-                    units=posting.units._replace(number=(amount.number).quantize(config.quantize)),
-                    cost=posting.cost,
-                    price=None,
-                    flag=None,
-                    meta={}
-                    if config.meta_name is None
-                    else {config.meta_name: posting.account + " " + amount.to_string()},
-                )
+                units=posting.units._replace(number=(remainder.number - total).quantize(config.quantize)),
+                meta=metaset.clear(posting.meta, config.mark_name),
             )
 
-        # 5.3. Handle relative amounts second: create new postings.
-        remainder = posting.units
-        total = D(0)
-        for percent, account in todo_percent:
-            units = posting.units._replace(number=(D(float(remainder.number) * percent)).quantize(config.quantize))
-            total = total + units.number
-            new_postings_inner.append(
-                Posting(
-                    account,
-                    units=units,
-                    cost=posting.cost,
-                    price=None,
-                    flag=None,
-                    meta={}
-                    if config.meta_name is None
-                    else {
-                        config.meta_name: posting.account
-                        + " "
-                        + str(int(percent * 100))
-                        + "% ("
-                        + units.to_string()
-                        + ")"
-                    },
-                )
-            )
-            if config.meta_name is not None:
-                posting = posting._replace(
-                    meta=metaset.add(
-                        posting.meta,
-                        config.meta_name,
-                        account + " " + str(int(percent * 100)) + "% (" + units.to_string() + ")",
-                    )
-                )
+            # if(posting.units.number > D(0)):
+            new_postings.append(posting)
 
-        # 5.4. Handle absent amounts third: create new postings.
-        total_percent = sum(i for i, _ in todo_percent)
-        percent = (1 - total_percent) / (1 + len(todo_absent))
-        for account in todo_absent:
-            units = posting.units._replace(number=(D(float(remainder.number) * percent)).quantize(config.quantize))
-            total = total + units.number
-            new_postings_inner.append(
-                Posting(
-                    account,
-                    units=units,
-                    cost=posting.cost,
-                    price=None,
-                    flag=None,
-                    meta={}
-                    if config.meta_name is None
-                    else {
-                        config.meta_name: posting.account
-                        + " ("
-                        + str(int(percent * 100))
-                        + "%, "
-                        + units.to_string()
-                        + ")"
-                    },
-                )
-            )
-            if config.meta_name is not None:
-                posting = posting._replace(
-                    meta=metaset.add(
-                        posting.meta,
-                        config.meta_name,
-                        account + " (" + str(int(percent * 100)) + "%, " + units.to_string() + ")",
-                    )
-                )
-
-        # 5.5. Handle original posting last (mutate!).
-        posting = posting._replace(
-            units=posting.units._replace(number=(remainder.number - total).quantize(config.quantize)),
-            meta=metaset.clear(posting.meta, config.mark_name),
-        )
-
-        # if(posting.units.number > D(0)):
-        new_postings.append(posting)
-
-        new_postings.extend(new_postings_inner)
+            new_postings.extend(new_postings_inner)
 
     for account in new_accounts:
         new_postings = merge_postings(account, new_postings, config.meta_name)
