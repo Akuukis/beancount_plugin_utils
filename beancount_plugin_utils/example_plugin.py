@@ -30,7 +30,7 @@ from beancount_plugin_utils.parse_config_string import (
 from beancount_plugin_utils.common import sum_income, sum_expenses
 import beancount_plugin_utils.metaset as metaset
 import beancount_plugin_utils.marked as marked
-from beancount_plugin_utils.BeancountError import BeancountError, plugin_error_handler, posting_error_handler
+from beancount_plugin_utils.BeancountError import plugin_error_handler, posting_error_handler
 from beancount_plugin_utils.merge_postings import merge_postings
 
 __plugins__ = ["example_plugin"]
@@ -49,13 +49,7 @@ class Config(NamedTuple):
 
 PluginExampleError = namedtuple("PluginExampleError", "source message entry")
 
-
-def raiseError(meta, message, entry):
-    raise BeancountError(meta, message, entry, PluginExampleError)
-
-
 new_accounts: Set[Account] = set()
-
 
 def example_plugin(entries: Entries, unused_options_map, config_string: str) -> Tuple[Entries, List[NamedTuple]]:
     new_entries: Entries = []
@@ -90,7 +84,7 @@ def example_plugin(entries: Entries, unused_options_map, config_string: str) -> 
         #### - if there's a global problem, return return original `entries` and appropriate errors.
         #### - if there's a entry level problem, push the original `entry` and an appropriate error to `errors`, and move on.
         new_entries[:], errors[:] = marked.on_marked_transactions(
-            per_marked_transaction, entries, config, config.mark_name, ("Income", "Expenses")
+            per_marked_transaction, entries, config, config.mark_name, ("Income", "Expenses"), PluginExampleError
         )
 
         if config.open_date != None:
