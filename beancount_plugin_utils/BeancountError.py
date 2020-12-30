@@ -56,11 +56,11 @@ def plugin_error_handler(
         errors[:] = [e.to_named_tuple()]
     except Exception as e:
         if "PYTEST_CURRENT_TEST" in os.environ:
-            print('\n')
-            print('Stack trace (pytest environment only):')
-            print('------------------------------------------------')
+            print("\n")
+            print("Stack trace (pytest environment only):")
+            print("------------------------------------------------")
             traceback.print_exc(file=sys.stdout)
-            print('\n')
+            print("\n")
         new_entries[:] = entries
         errors[:] = [named_tuple(new_metadata("<" + name + ">", 0), str(e), None)]
 
@@ -90,11 +90,11 @@ def entry_error_handler(
         errors.append(e.to_named_tuple())
     except Exception as e:
         if "PYTEST_CURRENT_TEST" in os.environ:
-            print('\n')
-            print('Stack trace (pytest environment only):')
-            print('------------------------------------------------')
+            print("\n")
+            print("Stack trace (pytest environment only):")
+            print("------------------------------------------------")
             traceback.print_exc(file=sys.stdout)
-            print('\n')
+            print("\n")
         new_entries.append(entry)
         errors.append(named_tuple(entry.meta, str(e), entry))
 
@@ -121,9 +121,9 @@ def posting_error_handler(tx_orig: Transaction, posting: Posting, named_tuple=Be
         raise e
     except Exception as e:
         if "PYTEST_CURRENT_TEST" in os.environ:
-            print('\n')
-            print('Stack trace (pytest environment only):')
-            print('------------------------------------------------')
+            print("\n")
+            print("Stack trace (pytest environment only):")
+            print("------------------------------------------------")
             traceback.print_exc(file=sys.stdout)
-            print('\n')
+            print("\n")
         raise BeancountError(posting.meta, str(e), tx_orig, named_tuple)
