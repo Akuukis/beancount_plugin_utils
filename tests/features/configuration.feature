@@ -18,7 +18,7 @@ Feature: Configure plugin behavior
 
     Then the original transaction should not be modified
     And should produce config error:
-      Invalid plugin configuration: Must be a single dict, skipping the plugin. The config: 'I am not an object'
+      Plugin configuration must be a dict, skipping.. The config: 'I am not an object'
 
   Scenario: Throw Error malicios config provided
 
@@ -32,7 +32,7 @@ Feature: Configure plugin behavior
 
     Then the original transaction should not be modified
     And should produce config error:
-      Invalid plugin configuration: Must be a single dict, skipping the plugin. The config: 'print(1)'
+      Plugin configuration must be a dict, skipping.. The config: 'print(1)'
 
   Scenario: Rename mark at tag
 

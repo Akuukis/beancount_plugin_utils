@@ -23,10 +23,7 @@ from beancount.core.data import (
     new_metadata,
 )
 
-from beancount_plugin_utils.parse_config_string import (
-    parse_config_string,
-    PluginUtilsConfigError,
-)
+from beancount_plugin_utils.parse_config_string import parse_config_string
 from beancount_plugin_utils.common import sum_income, sum_expenses
 import beancount_plugin_utils.metaset as metaset
 import beancount_plugin_utils.marked as marked
@@ -80,7 +77,7 @@ def load_config(config_string: str) -> Config:
     config_dict = parse_config_string(config_string)
 
     # 2. Apply transforms (e.g. from `str` to `date`) where needed.
-    # Wrap each transform separately in a try-except, and return PluginUtilsConfigError with a nice error message.
+    # Wrap each transform separately with a nice error message.
     try:
         if "open_date" in config_dict:
             config_dict["open_date"] = (

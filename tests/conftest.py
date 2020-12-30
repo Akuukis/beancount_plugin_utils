@@ -5,7 +5,7 @@ from beancount.core.data import Transaction
 from beancount.core.compare import hash_entry, includes_entries, excludes_entries
 from beancount.loader import load_string
 from beancount.parser import printer
-from context import example_plugin, metaset, parse_config_string, marked
+from context import example_plugin, metaset, marked, BeancountError
 
 def strip_flaky_meta(transaction: Transaction):
     transaction = transaction._replace(meta=metaset.discard(transaction.meta, 'filename'))
@@ -124,7 +124,7 @@ def not_error(errors):
 def config_error(input_txns, errors, exception_text):
     original_txn = input_txns[-1]
     assert len(errors) == 1
-    expected_error = parse_config_string.PluginUtilsConfigError(original_txn.meta, exception_text.strip('\n'), original_txn)
+    expected_error = example_plugin.PluginExampleError(original_txn.meta, exception_text.strip('\n'), original_txn)
     assert type(errors[0]) is type(expected_error)
     assert errors[0].message == expected_error.message
     assert errors[0].entry == None
@@ -155,5 +155,5 @@ def beancount_error(input_txns, errors, exception_text, output_txns):
     original_txn = input_txns[-1]
     modified_txn = output_txns[-1]
     assert len(errors) == 1
-    expected_error = parse_config_string.PluginUtilsConfigError(original_txn.meta, exception_text.strip('\n'), original_txn)
+    expected_error = BeancountError.BeancountError(original_txn.meta, exception_text.strip('\n'), original_txn)
     assert errors[0].message == expected_error.message and errors[0].entry == modified_txn
