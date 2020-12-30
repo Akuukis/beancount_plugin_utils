@@ -2,7 +2,7 @@ from collections import namedtuple
 from typing import NamedTuple, List
 from beancount.parser import printer
 from contextlib import contextmanager
-from beancount.core.data import Directive, Entries, Posting, Transaction
+from beancount.core.data import Directive, Entries, Posting, Transaction, new_metadata
 
 BeancountErrorNamedTuple = namedtuple("BeancountError", "source message entry")
 
@@ -22,9 +22,47 @@ class BeancountError(RuntimeError):
 
 
 @contextmanager
-def entry_error_handler(entry: Directive, new_entries: Entries, errors: List[NamedTuple], named_tuple: NamedTuple = BeancountErrorNamedTuple):
+def plugin_error_handler(
+    entries: Entries,
+    new_entries: Entries,
+    errors: List[NamedTuple],
+    name: str,
+    named_tuple: NamedTuple = BeancountErrorNamedTuple,
+):
     """
-    Packages errors for nice display within beancount.
+    Packages plugin-level errors for nice display within beancount.
+
+    Usage:
+        new_entries: Entries = []
+        errors: List[NamedTuple] = []
+
+        with plugin_error_handler(entries, new_entries, errors, "example_plugin", PluginExampleError):
+            raise RuntimeError('Hello World!')
+
+        return new_entries, errors
+
+    Args:
+        entry [Directive]: current entry.
+        new_entries [Entries]: list where to push original entry in case of error.
+        errors [List[NamedTuple]]: list where to push the error.
+        named_tuple [NamedTuple] (optional): use plugin-specific tuple instead of generic one.
+    """
+    try:
+        yield
+    except BeancountError as e:
+        new_entries[:] = entries
+        errors[:] = [e.to_named_tuple()]
+    except Exception as e:
+        new_entries[:] = entries
+        errors[:] = [named_tuple(new_metadata("<" + name + ">", 0), str(e), None)]
+
+
+@contextmanager
+def entry_error_handler(
+    entry: Directive, new_entries: Entries, errors: List[NamedTuple], named_tuple: NamedTuple = BeancountErrorNamedTuple
+):
+    """
+    Packages entry-level errors for nice display within beancount.
 
     Usage:
         for entry in entries:
@@ -44,13 +82,13 @@ def entry_error_handler(entry: Directive, new_entries: Entries, errors: List[Nam
         errors.append(e.to_named_tuple())
     except Exception as e:
         new_entries.append(entry)
-        errors.append(BeancountErrorNamedTuple(entry.meta, str(e), entry, named_tuple))
+        errors.append(named_tuple(entry.meta, str(e), entry, named_tuple))
 
 
 @contextmanager
 def posting_error_handler(tx_orig: Transaction, posting: Posting, named_tuple=BeancountErrorNamedTuple):
     """
-    Packages errors for nice display within beancount.
+    Packages posting-level errors for nice display within beancount.
 
     Usage:
         for entry in entries:

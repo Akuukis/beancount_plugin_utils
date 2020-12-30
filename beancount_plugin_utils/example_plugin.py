@@ -30,7 +30,7 @@ from beancount_plugin_utils.parse_config_string import (
 from beancount_plugin_utils.common import sum_income, sum_expenses
 import beancount_plugin_utils.metaset as metaset
 import beancount_plugin_utils.marked as marked
-from beancount_plugin_utils.BeancountError import BeancountError, posting_error_handler
+from beancount_plugin_utils.BeancountError import BeancountError, plugin_error_handler, posting_error_handler
 from beancount_plugin_utils.merge_postings import merge_postings
 
 __plugins__ = ["example_plugin"]
@@ -57,19 +57,18 @@ def raiseError(meta, message, entry):
 new_accounts: Set[Account] = set()
 
 
-def example_plugin(
-    entries: Entries,
-    unused_options_map,
-    config_dict_string: str,
-) -> Tuple[Entries, List[NamedTuple]]:
-    try:
+def example_plugin(entries: Entries, unused_options_map, config_string: str) -> Tuple[Entries, List[NamedTuple]]:
+    new_entries: Entries = []
+    errors: List[NamedTuple] = []
+
+    with plugin_error_handler(entries, new_entries, errors, "example_plugin", PluginExampleError):
         ############################################################################
         #### Load config (optional)
 
         # 1. Define a config structure first. See `class Config` above and adjust it as needed.
 
         # 2. Parse config string. Just copy/paste this block.
-        config_dict = parse_config_string(config_dict_string)
+        config_dict = parse_config_string(config_string)
 
         # 3. Apply transforms (e.g. from `str` to `date`) where needed.
         # Wrap each transform separately in a try-except, and return PluginUtilsConfigError with a nice error message.
@@ -79,11 +78,7 @@ def example_plugin(
                     None if config_dict["open_date"] is None else date.fromisoformat(config_dict["open_date"])
                 )
         except:
-            raiseError(
-                new_metadata("<example_plugin>", 0),
-                'Plugin "example_plugin" received bad "open_date" value - it must be a valid date, formatted in UTC (e.g. "2000-01-01").',
-                None,
-            )
+            raise RuntimeError('Bad "open_date" value - it must be a valid date, formatted in UTC (e.g. "2000-01-01").')
 
         # 4. Create config itself. Just copy/paste this block. Done!
         config = Config(**config_dict)
@@ -94,7 +89,7 @@ def example_plugin(
         #### - what plugin transforms, create a new object and push that into `new_entries`. DO NOT MUTATE original entry.
         #### - if there's a global problem, return return original `entries` and appropriate errors.
         #### - if there's a entry level problem, push the original `entry` and an appropriate error to `errors`, and move on.
-        new_entries, errors = marked.on_marked_transactions(
+        new_entries[:], errors[:] = marked.on_marked_transactions(
             per_marked_transaction, entries, config, config.mark_name, ("Income", "Expenses")
         )
 
@@ -104,16 +99,7 @@ def example_plugin(
                 open_entry = Open(new_meta, config.open_date, account, None, None)
                 new_entries.append(open_entry)
 
-        return new_entries, errors
-
-    except BeancountError as e:
-        return entries, [e.to_named_tuple()]
-    else:
-        return entries, PluginExampleError(
-            new_metadata("<example_plugin>", 0),
-            "Unhandled error.",
-            None,
-        )
+    return new_entries, errors
 
 
 def per_marked_transaction(tx: Transaction, tx_orig: Transaction, config: Config) -> List[Transaction]:
