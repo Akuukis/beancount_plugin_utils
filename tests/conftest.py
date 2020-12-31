@@ -5,19 +5,7 @@ from beancount.core.data import Transaction
 from beancount.core.compare import hash_entry, includes_entries, excludes_entries
 from beancount.loader import load_string
 from beancount.parser import printer
-from context import example_plugin, metaset, marked, BeancountError
-
-def strip_flaky_meta(transaction: Transaction):
-    transaction = transaction._replace(meta=metaset.discard(transaction.meta, 'filename'))
-    transaction = transaction._replace(meta=metaset.discard(transaction.meta, 'lineno'))
-    # new_postings = list(tx.postings)
-    for j,_ in enumerate(transaction.postings):
-        transaction.postings[j] = transaction.postings[j]._replace(meta=metaset.discard(transaction.postings[j].meta, 'filename'))
-        transaction.postings[j] = transaction.postings[j]._replace(meta=metaset.discard(transaction.postings[j].meta, 'lineno'))
-        transaction.postings[j] = transaction.postings[j]._replace(meta=metaset.discard(transaction.postings[j].meta, '__automatic__'))
-    # transaction._replace(postings=new_postings)
-
-    return transaction
+from context import example_plugin, metaset, marked, BeancountError, test_utils
 
 
 @fixture
@@ -77,11 +65,11 @@ def original_txn_modified(output_txns, errors, correctly_modified_txn_text):
     # Get modified original transaction from output of plugin
     # The modified originial transaction will be the last in the list of output transactions
     try:
-        modified_txn = strip_flaky_meta(output_txns[-1])
+        modified_txn = test_utils.strip_flaky_meta(output_txns[-1])
     except IndexError as error:
         raise error
     # Get correctly modified original transaction from feature file
-    correctly_modified_txn = strip_flaky_meta(load_string(correctly_modified_txn_text)[0][-1])
+    correctly_modified_txn = test_utils.strip_flaky_meta(load_string(correctly_modified_txn_text)[0][-1])
 
     print(" ; RECEIVED:\n", printer.format_entry(modified_txn))
     print(" ; EXPECTED:\n", printer.format_entry(correctly_modified_txn))
@@ -101,8 +89,8 @@ def original_txn_modified(output_txns, errors, correctly_modified_txn_text):
 
 @then(parsers.parse('the original transaction should not be modified'))
 def tx_not_modified(input_txns, output_txns):
-    original_txn = strip_flaky_meta(input_txns[-1])
-    modified_txn = strip_flaky_meta(output_txns[-1])
+    original_txn = test_utils.strip_flaky_meta(input_txns[-1])
+    modified_txn = test_utils.strip_flaky_meta(output_txns[-1])
     try:
         assert hash_entry(original_txn) == hash_entry(modified_txn)
     except AssertionError:
@@ -137,17 +125,17 @@ def plugin_error(input_txns, errors, exception_text):
     expected_error = example_plugin.PluginExampleError(original_txn.meta, exception_text.strip('\n'), original_txn)
     assert type(errors[0]) is type(expected_error)
     assert errors[0].message == expected_error.message
-    assert strip_flaky_meta(errors[0].entry) == strip_flaky_meta(expected_error.entry)
+    assert test_utils.strip_flaky_meta(errors[0].entry) == test_utils.strip_flaky_meta(expected_error.entry)
 
 @then(parsers.parse('should produce marked error:'
                     '{exception_text}'))
-def plugin_error(input_txns, errors, exception_text):
+def marked_error(input_txns, errors, exception_text):
     original_txn = input_txns[-1]
     assert len(errors) == 1
     expected_error = marked.PluginUtilsMarkedError(original_txn.meta, exception_text.strip('\n'), original_txn)
     assert type(errors[0]) is type(expected_error)
     assert errors[0].message == expected_error.message
-    assert strip_flaky_meta(errors[0].entry) == strip_flaky_meta(expected_error.entry)
+    assert test_utils.strip_flaky_meta(errors[0].entry) == test_utils.strip_flaky_meta(expected_error.entry)
 
 @then(parsers.parse('should produce beancount error:'
                     '{exception_text}'))
