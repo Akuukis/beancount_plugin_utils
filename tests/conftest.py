@@ -24,8 +24,13 @@ def output_txns():
     return list()
 
 @fixture
+def input_txns():
+    return list()
+
+@fixture
 def errors():
     return list()
+
 
 @given(parsers.parse('this config:'
                      '{config}'))
@@ -35,22 +40,18 @@ def config_custom(config):
 @given(parsers.parse('the following setup:'
                      '{setup_txns_text}'))
 def setup_txns(setup_txns_text):
-    return setup_txns_text
-
-@given(parsers.parse('the following beancount transaction:'
-                     '{input_txn_text}'))
-def input_txns(input_txn_text):
-    input_txns, _, _ = load_string(input_txn_text)
-    assert len(input_txns) == 1  # Only one entry in feature file example
-    return input_txns
+    pass
 
 
 @when(parsers.parse('this transaction is processed:'
                     '{input_txn_text}'))
 def is_processed(input_txns, errors, config, input_txn_text, setup_txns_text, output_txns):
-    text = 'plugin "beancount_plugin_utils.example_plugin" "' + config.strip('\n') + '"\n' + setup_txns_text + input_txn_text
-    print('\nInput (full & raw):\n------------------------------------------------\n' + text + '\n')
-    output_txns[:], errors[:], _ = load_string(text)
+    input_txns[:], _, _ = load_string(setup_txns_text + input_txn_text)
+    prefix_plugin_text = 'plugin "beancount_plugin_utils.example_plugin" "' + config.strip('\n') + '"\n'
+    full_text = prefix_plugin_text + setup_txns_text + input_txn_text
+    print('\nInput (full & raw):\n------------------------------------------------')
+    print(full_text + '\n')
+    output_txns[:], errors[:], _ = load_string(full_text)
     print('\nOutput (Transactions):\n------------------------------------------------\n')
     for txn in output_txns:
         print(printer.format_entry(txn))
