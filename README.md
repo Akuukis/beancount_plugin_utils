@@ -17,6 +17,8 @@ A collection of utils for writing beancount plugins:
 
 Also see test framework and feel free to copy it.
 
+**Note: NOT READY FOR PUBLIC YET, STILL MIGRATING MY OWN PLUGINS. ANYTHING CAN CHANGE WITHOUT NOTICE.**
+
 
 
 
