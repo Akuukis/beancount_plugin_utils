@@ -18,11 +18,11 @@ def strip_flaky_meta(transaction: Transaction):
     """
     copy = deepcopy(transaction)
 
-    copy = copy._replace(meta=metaset.discard(copy.meta, 'filename'))
-    copy = copy._replace(meta=metaset.discard(copy.meta, 'lineno'))
-    for j,_ in enumerate(copy.postings):
-        copy.postings[j] = copy.postings[j]._replace(meta=metaset.discard(copy.postings[j].meta, 'filename'))
-        copy.postings[j] = copy.postings[j]._replace(meta=metaset.discard(copy.postings[j].meta, 'lineno'))
-        copy.postings[j] = copy.postings[j]._replace(meta=metaset.discard(copy.postings[j].meta, '__automatic__'))
+    copy = copy._replace(meta=metaset.discard(copy.meta, "filename"))
+    copy = copy._replace(meta=metaset.discard(copy.meta, "lineno"))
+    for j, _ in enumerate(copy.postings):
+        copy.postings[j] = copy.postings[j]._replace(meta=metaset.discard(copy.postings[j].meta, "filename"))
+        copy.postings[j] = copy.postings[j]._replace(meta=metaset.discard(copy.postings[j].meta, "lineno"))
+        copy.postings[j] = copy.postings[j]._replace(meta=metaset.discard(copy.postings[j].meta, "__automatic__"))
 
     return copy
