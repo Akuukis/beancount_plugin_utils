@@ -1,7 +1,6 @@
 from pytest import fixture
 from pytest_bdd import given, when, then, parsers, scenarios
 
-from beancount.core.data import Transaction
 from beancount.core.compare import hash_entry, includes_entries, excludes_entries
 from beancount.loader import load_string
 from beancount.parser import printer

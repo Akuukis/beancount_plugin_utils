@@ -11,7 +11,7 @@ with open(path.join(this_directory, 'README.md'), encoding='utf-8') as f:
 setup(
     name='beancount_plugin_utils',
     version='0.0.2',
-    description='Plugin for Beancount to share expenses.',
+    description='Utils for beancount plugin writers - BeancountError, mark, metaset, etc.',
 
     long_description=long_description,
     long_description_content_type='text/markdown',
