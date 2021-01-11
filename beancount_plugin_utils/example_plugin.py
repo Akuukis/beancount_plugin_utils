@@ -122,6 +122,9 @@ def per_marked_transaction(tx: Transaction, tx_orig: Transaction, config: Config
 
 
 def per_marked_posting(posting: Posting, config: Config, account_prefix: str, total_value: Amount):
+    if posting.meta == None:
+        return [posting]
+
     marks = metaset.get(posting.meta, config.mark_name)
 
     # 4.1. or skip if not marked.

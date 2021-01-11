@@ -22,6 +22,8 @@ def normalize_transaction(
     Move marks in tags with name `mark_name` into meta, if any, and merge with marks in meta in a way of metaset.
     Then, if `account_types` are provided, move marks into postings with the given account types or error if there's none such posting.
 
+    Note: in beancount `meta` is mandatory on transactions, but optional on postings.
+
     Example:
 
         try:
@@ -61,26 +63,31 @@ def normalize_transaction(
         is_used = True
 
     for posting in copy.postings:
-        if metaset.has(posting.meta, mark_name):
-            is_used = True
-            if not account_types:
-                raise BeancountError(
-                    posting.meta,
-                    'Mark "{}" can be only applied to transactions, not postings: "{}".'.format(
-                        mark_name, posting.account
-                    ),
-                    tx,
-                    PluginUtilsMarkedError,
-                )
-            if not (posting.account.split(":")[0] in account_types):
-                raise BeancountError(
-                    posting.meta,
-                    'Mark "{}" can be only applied to posting with account types of: {}'.format(
-                        mark_name, account_types
-                    ),
-                    tx,
-                    PluginUtilsMarkedError,
-                )
+        if(posting.meta == None):
+            continue
+        if not metaset.has(posting.meta, mark_name):
+            continue
+
+        is_used = True
+
+        if not account_types:
+            raise BeancountError(
+                posting.meta,
+                'Mark "{}" can be only applied to transactions, not postings: "{}".'.format(
+                    mark_name, posting.account
+                ),
+                tx,
+                PluginUtilsMarkedError,
+            )
+        if not (posting.account.split(":")[0] in account_types):
+            raise BeancountError(
+                posting.meta,
+                'Mark "{}" can be only applied to posting with account types of: {}'.format(
+                    mark_name, account_types
+                ),
+                tx,
+                PluginUtilsMarkedError,
+            )
 
     if not account_types:
         return copy, is_used
@@ -94,6 +101,10 @@ def normalize_transaction(
     copy = copy._replace(meta=metaset.clear(copy.meta, mark_name))
 
     for posting in copy.postings:
+        if(posting.meta == None):
+            postings.append(posting)
+            continue
+
         marks = metaset.get(posting.meta, mark_name)
 
         if len(marks) > 0:
