@@ -63,7 +63,7 @@ def normalize_transaction(
         is_used = True
 
     for posting in copy.postings:
-        if(posting.meta == None):
+        if posting.meta == None:
             continue
         if not metaset.has(posting.meta, mark_name):
             continue
@@ -73,18 +73,14 @@ def normalize_transaction(
         if not account_types:
             raise BeancountError(
                 posting.meta,
-                'Mark "{}" can be only applied to transactions, not postings: "{}".'.format(
-                    mark_name, posting.account
-                ),
+                'Mark "{}" can be only applied to transactions, not postings: "{}".'.format(mark_name, posting.account),
                 tx,
                 PluginUtilsMarkedError,
             )
         if not (posting.account.split(":")[0] in account_types):
             raise BeancountError(
                 posting.meta,
-                'Mark "{}" can be only applied to posting with account types of: {}'.format(
-                    mark_name, account_types
-                ),
+                'Mark "{}" can be only applied to posting with account types of: {}'.format(mark_name, account_types),
                 tx,
                 PluginUtilsMarkedError,
             )
@@ -101,10 +97,6 @@ def normalize_transaction(
     copy = copy._replace(meta=metaset.clear(copy.meta, mark_name))
 
     for posting in copy.postings:
-        if(posting.meta == None):
-            postings.append(posting)
-            continue
-
         marks = metaset.get(posting.meta, mark_name)
 
         if len(marks) > 0:
